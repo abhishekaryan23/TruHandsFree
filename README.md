@@ -113,20 +113,20 @@ TruHandsFree natively registers global keyboard hooks. You do not need to have t
 
 | Hotkey | Mode | Pipeline |
 |--------|------|--------------------------------------------------|
-| `⌃ + ⇧ + D` <br> `⌘ + ⇧ + D` | **Pure Dictation** | Raw Speech → Whisper STT → Paste raw transcript |
-| `⌃ + ⇧ + T` <br> `⌘ + ⇧ + T` | **Smart Transform** | Speech → STT → LLM Agent + Custom Skills → Paste formatted text |
+| `⌃ + D` <br> `⌘ + D` | **Pure Dictation** | Raw Speech → Whisper STT → Paste raw transcript |
+| `⌃ + T` <br> `⌘ + T` | **Smart Transform** | Speech → STT → LLM Agent + Custom Skills → Paste formatted text |
 
 Each hotkey acts as a **toggle**:
-1. Press `⌃ + ⇧ + D` once to **Start Recording**. A sound will chime, and the floating widget will pulse green.
+1. Press `⌃ + D` once to **Start Recording**. A sound will chime, and the floating widget will pulse green.
 2. Speak your thoughts naturally.
-3. Press `⌃ + ⇧ + D` again to **Stop Recording**. 
+3. Press `⌃ + D` again to **Stop Recording**. 
 4. The backend processes the audio, and injects the text natively into your active window via `nut-js` hardware emulation.
 
 ---
 
 ## 🧠 Smart Engine & Custom Skills
 
-The **Smart Transform (`⌃ + ⇧ + T`)** mode is context-aware. It actively reads which application you are currently typing in (e.g., "Code", "Slack", "Chrome") and applies **Custom Skills** to rewrite your text appropriately.
+The **Smart Transform (`⌃ + T`)** mode is context-aware. It actively reads which application you are currently typing in (e.g., "Code", "Slack", "Chrome") and applies **Custom Skills** to rewrite your text appropriately.
 
 ### Adding Personal Skills
 Open the **Settings Window** by clicking the Gear (⚙️) icon on the floating widget, and navigate to the **Skills** tab.
