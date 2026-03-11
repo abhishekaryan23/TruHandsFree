@@ -1,7 +1,7 @@
 # TruHandsFree
 
 <p align="center">
-  <img src="frontend/build/Icon.png" width="128" alt="TruHandsFree Logo">
+  <img src="assets/logo.png" width="128" alt="TruHandsFree Logo">
 </p>
 
 **macOS-native, LLM/STT provider-agnostic smart dictation and text transformation agent.**
