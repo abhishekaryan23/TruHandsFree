@@ -1,0 +1,16 @@
+pyobjc
+pydantic
+keyring
+sounddevice
+numpy
+scipy
+requests
+langchain
+langchain-groq
+langchain-openai
+langchain-anthropic
+fastapi
+uvicorn
+pynput
+
+pyinstaller
