@@ -45,6 +45,8 @@ class SupervisorAgent:
 --- CURRENT ACTIVE WINDOW CONTEXT ---
 App Name: {app_name}
 Window Title: {window_title}
+Page Title: {page_title}
+Site Host: {url_host}
 -------------------------------------
 """
         
@@ -66,6 +68,8 @@ Window Title: {window_title}
                 "system_instruction": system_instruction,
                 "app_name": os_context.get("app_name", "Unknown"),
                 "window_title": os_context.get("window_title", "Unknown"),
+                "page_title": os_context.get("page_title", "Unknown"),
+                "url_host": os_context.get("url_host", "Unknown"),
                 "transcript": raw_transcript
             })
             

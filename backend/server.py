@@ -1,6 +1,7 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+from typing import Optional
 import uvicorn
 import threading
 
@@ -32,6 +33,18 @@ engine = TruHandsFreeEngine()
 class APIKeyPayload(BaseModel):
     provider: str
     key: str
+
+class SmartContextPayload(BaseModel):
+    app_name: str = "Unknown"
+    bundle_id: Optional[str] = None
+    window_title: Optional[str] = None
+    page_title: Optional[str] = None
+    url_host: Optional[str] = None
+
+class ToggleRecordingPayload(BaseModel):
+    mode: str = "dictation"
+    context: Optional[SmartContextPayload] = None
+    context_warning: Optional[str] = None
 
 @app.on_event("startup")
 def startup_event():
@@ -118,29 +131,37 @@ def get_status():
         "audio_amplitude": engine.audio_manager.current_amplitude if engine.is_recording else 0.0,
         "last_error": engine.last_error,
         "pending_paste_text": engine.pending_paste_text,
-        "missing_api_keys": not (stt_key and llm_key)
+        "missing_api_keys": not (stt_key and llm_key),
+        "phase": engine.phase,
+        "phase_label": engine.phase_label,
+        "captured_context": engine.captured_context,
+        "context_warning": engine.context_warning,
     }
 
 @app.post("/status/clear_paste")
 def clear_paste():
     """Clears the pending text after the Electron UI has successfully copied it."""
-    engine.pending_paste_text = None
+    engine.clear_pending_paste()
     return {"status": "cleared"}
 
 @app.post("/recording/toggle")
-def toggle_recording(body: dict):
+def toggle_recording(payload: ToggleRecordingPayload):
     """
     Toggle recording on/off via the widget buttons or Electron hotkeys.
     Body: { "mode": "dictation" | "smart_transform" }
     """
-    mode = body.get("mode", "dictation")
+    mode = payload.mode
     logger.info(f"[API] Toggle recording request — mode: {mode}, currently_recording: {engine.is_recording}")
     
     if engine.is_recording:
         engine.stop_and_process()
         return {"status": "stopped", "message": f"Stopped {mode} recording, processing..."}
     else:
-        engine.trigger_recording(mode=mode)
+        engine.trigger_recording(
+            mode=mode,
+            context=payload.context.model_dump() if payload.context else None,
+            context_warning=payload.context_warning,
+        )
         return {"status": "started", "message": f"Started {mode} recording"}
 
 @app.get("/audio/devices")

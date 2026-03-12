@@ -23,7 +23,7 @@
       "entitlementsInherit": "build/entitlements.mac.plist",
       "extendInfo": {
         "NSMicrophoneUsageDescription": "TruHandsFree needs microphone access to transcribe your speech.",
-        "NSAppleEventsUsageDescription": "TruHandsFree needs accessibility to paste text into your active application."
+        "NSAppleEventsUsageDescription": "TruHandsFree uses Automation to read the frontmost app and supported browser tab metadata for Smart Mode."
       }
     },
     "dmg": {
@@ -59,7 +59,6 @@
     "framer-motion": "^12.35.2",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
-    "react-icons": "^5.6.0",
     "react-router-dom": "^6.30.3",
     "tailwind-merge": "^3.5.0",
     "zustand": "^5.0.11"

@@ -1,14 +1,25 @@
 import { app, BrowserWindow, ipcMain, Tray, Menu, globalShortcut, clipboard, systemPreferences } from 'electron'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
-import { spawn, ChildProcess } from 'node:child_process'
+import { spawn } from 'node:child_process'
+import type { ChildProcess } from 'node:child_process'
 import http from 'node:http'
 import fs from 'node:fs'
 import os from 'node:os'
 import { keyboard, Key } from '@nut-tree-fork/nut-js'
+import { captureSmartContext, getSmartContextAccessStatus } from './smartContext'
 const logDir = path.join(os.homedir(), '.truhandsfree', 'logs')
 if (!fs.existsSync(logDir)) fs.mkdirSync(logDir, { recursive: true })
 const electronLogStr = fs.createWriteStream(path.join(logDir, 'electron.log'), { flags: 'a' })
+const API_BASE = 'http://127.0.0.1:8055'
+
+type RecordingMode = 'dictation' | 'smart_transform'
+type BackendBootState = {
+    phase: 'booting_backend' | 'ready' | 'error'
+    label: string
+    detail: string
+    progress: number | null
+}
 
 function logToFile(msg: string) {
     const ts = new Date().toISOString()
@@ -30,6 +41,56 @@ let widgetWin: BrowserWindow | null = null
 let settingsWin: BrowserWindow | null = null
 let pythonProcess: ChildProcess | null = null
 let tray: Tray | null = null
+let backendProbeTimer: NodeJS.Timeout | null = null
+let backendBootState: BackendBootState = {
+    phase: 'booting_backend',
+    label: 'Preparing TruHandsFree',
+    detail: 'Checking the local engine.',
+    progress: 12,
+}
+
+function setBackendBootState(nextState: BackendBootState) {
+    backendBootState = nextState
+    for (const win of BrowserWindow.getAllWindows()) {
+        win.webContents.send('backend-boot-state', backendBootState)
+    }
+}
+
+function scheduleBackendReadyProbe(attempt = 0) {
+    if (backendProbeTimer) clearTimeout(backendProbeTimer)
+    backendProbeTimer = setTimeout(async () => {
+        const alive = await isBackendAlive()
+        if (alive) {
+            setBackendBootState({
+                phase: 'ready',
+                label: 'Engine ready',
+                detail: 'The local backend is ready for dictation and Smart Mode.',
+                progress: 100,
+            })
+            backendProbeTimer = null
+            return
+        }
+
+        if (attempt >= 20) {
+            setBackendBootState({
+                phase: 'error',
+                label: 'Engine unavailable',
+                detail: 'The local backend did not finish starting. Open Setup for troubleshooting.',
+                progress: null,
+            })
+            backendProbeTimer = null
+            return
+        }
+
+        setBackendBootState({
+            phase: 'booting_backend',
+            label: 'Connecting to backend',
+            detail: 'Waiting for the local engine to accept requests.',
+            progress: Math.min(92, 62 + (attempt * 2)),
+        })
+        scheduleBackendReadyProbe(attempt + 1)
+    }, attempt === 0 ? 250 : 700)
+}
 
 function toggleWidget() {
     if (!widgetWin) return
@@ -127,14 +188,32 @@ function isBackendAlive(): Promise<boolean> {
 
 async function startBackend() {
     console.log("Checking if backend is already running...")
+    setBackendBootState({
+        phase: 'booting_backend',
+        label: 'Checking local engine',
+        detail: 'Looking for an existing backend on port 8055.',
+        progress: 18,
+    })
 
     const alreadyRunning = await isBackendAlive()
     if (alreadyRunning) {
         console.log("Backend is already running on port 8055. Skipping spawn.")
+        setBackendBootState({
+            phase: 'ready',
+            label: 'Engine ready',
+            detail: 'Connected to the existing local backend.',
+            progress: 100,
+        })
         return
     }
 
     logToFile("Starting/Checking Python backend...")
+    setBackendBootState({
+        phase: 'booting_backend',
+        label: 'Starting local engine',
+        detail: 'Launching the Python backend and loading providers.',
+        progress: 42,
+    })
 
     if (app.isPackaged) {
         logToFile(`Packaged Mode: Spawning Engine from ${path.join(process.resourcesPath, 'truhandsfree-engine')}`)
@@ -157,11 +236,33 @@ async function startBackend() {
 
     pythonProcess.on('error', (err) => {
         logToFile(`Failed to start python backend: ${err.message}`)
+        setBackendBootState({
+            phase: 'error',
+            label: 'Engine unavailable',
+            detail: 'The local backend could not be started. Open Setup for troubleshooting.',
+            progress: null,
+        })
     })
 
     pythonProcess.on('exit', (code) => {
         logToFile(`Python backend exited with code ${code}`)
+        if (code !== 0) {
+            setBackendBootState({
+                phase: 'error',
+                label: 'Engine stopped',
+                detail: 'The local backend exited unexpectedly.',
+                progress: null,
+            })
+        }
     })
+
+    setBackendBootState({
+        phase: 'booting_backend',
+        label: 'Connecting to backend',
+        detail: 'Waiting for the local engine to accept requests.',
+        progress: 64,
+    })
+    scheduleBackendReadyProbe()
 }
 
 function stopBackend() {
@@ -186,15 +287,13 @@ function registerHotkeys() {
     // Since we just started the backend, we can just hardcode the defaults for now,
     // or fetch from backend API. For reliability, we hardcode defaults and allow UI override later.
 
-    const triggerBackendMode = (mode: string) => {
-        fetch('http://127.0.0.1:8055/recording/toggle', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ mode })
-        }).catch(err => logToFile(`Hotkey fetch failed: ${err.message}`))
-
-        // Ensure widget is visible so user sees recording status
-        if (widgetWin && !widgetWin.isVisible()) toggleWidget()
+    const triggerBackendMode = async (mode: RecordingMode) => {
+        try {
+            await sendRecordingToggle(mode)
+            if (widgetWin && !widgetWin.isVisible()) toggleWidget()
+        } catch (err: any) {
+            logToFile(`Hotkey fetch failed: ${err.message}`)
+        }
     }
 
     globalShortcut.register('CommandOrControl+D', () => {
@@ -216,6 +315,33 @@ function registerHotkeys() {
         logToFile("Hotkey registered: Ctrl+T pressed (Smart Transform)")
         triggerBackendMode('smart_transform')
     })
+}
+
+async function sendRecordingToggle(mode: RecordingMode) {
+    let contextPayload: Record<string, unknown> | null = null
+    let contextWarning: string | null = null
+
+    if (mode === 'smart_transform') {
+        const captured = await captureSmartContext()
+        contextPayload = captured.context
+        contextWarning = captured.warning
+    }
+
+    const response = await fetch(`${API_BASE}/recording/toggle`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            mode,
+            context: contextPayload,
+            context_warning: contextWarning,
+        })
+    })
+
+    if (!response.ok) {
+        throw new Error(`Recording toggle failed with ${response.status}`)
+    }
+
+    return response.json()
 }
 
 app.on('will-quit', () => {
@@ -307,10 +433,40 @@ ipcMain.handle('check-accessibility', () => {
     return true
 })
 
+ipcMain.handle('get-microphone-access-status', () => {
+    if (process.platform === 'darwin') {
+        return systemPreferences.getMediaAccessStatus('microphone')
+    }
+    return 'granted'
+})
+
+ipcMain.handle('request-microphone-access', async () => {
+    if (process.platform === 'darwin') {
+        return systemPreferences.askForMediaAccess('microphone')
+    }
+    return true
+})
+
 ipcMain.on('prompt-accessibility', () => {
     if (process.platform === 'darwin') {
         systemPreferences.isTrustedAccessibilityClient(true) // true triggers the system dialog
     }
+})
+
+ipcMain.handle('check-smart-context-access', async () => {
+    return getSmartContextAccessStatus()
+})
+
+ipcMain.handle('prompt-smart-context-access', async () => {
+    return getSmartContextAccessStatus()
+})
+
+ipcMain.handle('toggle-recording', async (_event, mode: RecordingMode) => {
+    return sendRecordingToggle(mode)
+})
+
+ipcMain.handle('get-backend-boot-state', () => {
+    return backendBootState
 })
 
 ipcMain.on('simulate-paste', (_event, text) => {

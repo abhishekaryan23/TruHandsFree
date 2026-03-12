@@ -1,5 +1,7 @@
 /// <reference types="vite/client" />
 
+import type { BackendBootState, RecordingMode, SmartContextAccessStatus } from './types'
+
 export interface IpcRenderer {
     on(channel: string, listener: (event: any, ...args: any[]) => void): this;
     off(channel: string, ...omit: any[]): this;
@@ -14,8 +16,15 @@ export interface WindowControls {
     getPlatform: () => Promise<string>;
     checkAccessibility: () => Promise<boolean>;
     promptAccessibility: () => void;
+    getMicrophoneAccessStatus: () => Promise<string>;
+    requestMicrophoneAccess: () => Promise<boolean>;
+    checkSmartContextAccess: () => Promise<SmartContextAccessStatus>;
+    promptSmartContextAccess: () => Promise<SmartContextAccessStatus>;
+    toggleRecording: (mode: RecordingMode) => Promise<{ status: string; message: string }>;
+    getBackendBootState: () => Promise<BackendBootState>;
     simulatePaste: (text: string) => void;
-    onPasteError: (callback: () => void) => void;
+    onPasteError: (callback: () => void) => () => void;
+    onBackendBootState: (callback: (state: BackendBootState) => void) => () => void;
 }
 
 declare global {

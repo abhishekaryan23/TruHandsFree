@@ -8,10 +8,10 @@ class DefaultSkills:
     DICTATION = {
         "id": "system_dictation",
         "name": "Standard Dictation",
-        "description": "Exactly transcribes what you said, adjusting ONLY for the active application context (e.g., formatting as a text message vs a code comment). Do not change the underlying meaning.",
+        "description": "Exactly transcribes what you said, adjusting ONLY for the active application and page context when available. Do not change the underlying meaning.",
         "prompt": """
 You are an expert transcription formatter. 
-Your ONLY job is to take the provided STT transcript and format it so it looks mathematically, grammatically, and contextually perfect for the target active window.
+Your ONLY job is to take the provided STT transcript and format it so it looks mathematically, grammatically, and contextually perfect for the target active app, window, and site context.
 
 RULES:
 1. Do NOT add conversational filler (e.g., "Here is the text:", "Sure!").
@@ -19,7 +19,8 @@ RULES:
 3. If the active window is 'Terminal' or 'iTerm', format it as a valid bash/zsh command.
 4. If the active window is a code editor (e.g., 'Code', 'Cursor', 'PyCharm'), format it appropriately based on the window title (e.g., if title ends in .py, format as python code).
 5. If the active window is a messaging app (e.g., 'Slack', 'Discord'), format it as a casual message.
-6. OUTPUT ONLY THE FINAL TEXT to be typed. Nothing else.
+6. If page title or site host is present, use it to tailor formatting for the destination, but never invent site details that are not provided.
+7. OUTPUT ONLY THE FINAL TEXT to be typed. Nothing else.
 """
     }
 

@@ -4,19 +4,21 @@
   --font-sans: 'Inter', 'SF Pro Display', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   --font-mono: 'JetBrains Mono', 'SF Mono', 'Fira Code', monospace;
 
-  --color-bg-app-base: hsl(220, 20%, 4%);
-  --color-bg-surface-elevated: hsl(220, 20%, 10%);
-  --color-bg-surface-glass: rgba(255, 255, 255, 0.03);
+  --color-bg-app-base: hsl(203, 58%, 5%);
+  --color-bg-surface-elevated: hsl(206, 42%, 10%);
+  --color-bg-surface-glass: rgba(255, 255, 255, 0.035);
 
-  --color-text-primary: hsl(220, 10%, 95%);
-  --color-text-secondary: hsl(220, 10%, 65%);
-  --color-text-muted: hsl(220, 10%, 40%);
+  --color-text-primary: hsl(191, 22%, 94%);
+  --color-text-secondary: hsl(198, 16%, 70%);
+  --color-text-muted: hsl(198, 10%, 45%);
 
-  --color-accent-primary: hsl(250, 85%, 65%);
+  --color-accent-primary: hsl(184, 86%, 49%);
+  --color-accent-secondary: hsl(190, 93%, 74%);
+  --color-accent-tertiary: hsl(197, 54%, 26%);
 
-  --color-semantic-success: hsl(150, 80%, 40%);
-  --color-semantic-error: hsl(350, 80%, 55%);
-  --color-semantic-warning: hsl(35, 90%, 55%);
+  --color-semantic-success: hsl(148, 67%, 44%);
+  --color-semantic-error: hsl(351, 89%, 64%);
+  --color-semantic-warning: hsl(41, 95%, 60%);
 }
 
 @layer base {
@@ -28,7 +30,9 @@
     width: 100vw;
     height: 100vh;
     overflow: hidden;
-    background-color: transparent;
+    background:
+      radial-gradient(circle at top, rgba(18, 222, 230, 0.12), transparent 35%),
+      linear-gradient(180deg, rgba(4, 12, 19, 1), rgba(2, 7, 12, 1));
     color: var(--color-text-primary);
     font-family: var(--font-sans);
     user-select: none;
@@ -85,7 +89,7 @@
   }
 
   .glass-card {
-    @apply bg-bg-surface-elevated/70 backdrop-blur-md border border-white/5 rounded-xl;
+    @apply rounded-[26px] border border-white/8 bg-[linear-gradient(180deg,rgba(8,22,33,0.74),rgba(3,11,17,0.9))] backdrop-blur-md shadow-[0_14px_36px_rgba(0,0,0,0.22)];
   }
 
   .titlebar-drag {
@@ -142,6 +146,16 @@
   }
 }
 
+@keyframes loaderSweep {
+  0% {
+    transform: translateX(-110%);
+  }
+
+  100% {
+    transform: translateX(260%);
+  }
+}
+
 .animate-fade-in-up {
   animation: fadeInUp 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
@@ -158,4 +172,8 @@
 
 .animate-spin-smooth {
   animation: spinSmooth 0.8s linear infinite;
+}
+
+.animate-loader-sweep {
+  animation: loaderSweep 1.4s cubic-bezier(0.2, 0.8, 0.2, 1) infinite;
 }

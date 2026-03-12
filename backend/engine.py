@@ -37,9 +37,12 @@ class TruHandsFreeEngine:
         )
         
         self._is_processing = False
+        self._phase = "ready"
         self._active_mode: Optional[str] = None  # 'dictation' or 'smart_transform'
         self.last_error: Optional[str] = None  # Tracks pipeline errors for the UI toast
         self.pending_paste_text: Optional[str] = None # Text ready for Electron to paste
+        self.context_warning: Optional[str] = None
+        self.captured_context: Dict[str, Any] = self._normalize_context()
 
         logger.info(f"[Engine] Initialized — STT: {config.stt.provider}/{config.stt.model}, LLM: {config.llm.provider}/{config.llm.model}")
 
@@ -55,7 +58,45 @@ class TruHandsFreeEngine:
     def active_mode(self) -> Optional[str]:
         return self._active_mode
 
-    def trigger_recording(self, mode: str = "dictation"):
+    @property
+    def phase(self) -> str:
+        return self._phase
+
+    @property
+    def phase_label(self) -> str:
+        if self._phase == "transforming":
+            app_name = self.captured_context.get("app_name") or "Unknown"
+            url_host = self.captured_context.get("url_host")
+            if url_host:
+                return f"Transforming for {app_name} • {url_host}"
+            if app_name and app_name != "Unknown":
+                return f"Transforming for {app_name}"
+
+        labels = {
+            "booting_backend": "Booting backend",
+            "ready": "Ready",
+            "recording": "Recording",
+            "transcribing": "Transcribing speech",
+            "transforming": "Transforming transcript",
+            "preparing_paste": "Preparing paste",
+            "error": "Attention needed",
+        }
+        return labels.get(self._phase, "Ready")
+
+    def _normalize_context(self, context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        payload = context or {}
+        return {
+            "app_name": payload.get("app_name") or "Unknown",
+            "bundle_id": payload.get("bundle_id") or None,
+            "window_title": payload.get("window_title") or None,
+            "page_title": payload.get("page_title") or None,
+            "url_host": payload.get("url_host") or None,
+        }
+
+    def _set_phase(self, phase: str):
+        self._phase = phase
+
+    def trigger_recording(self, mode: str = "dictation", context: Optional[Dict[str, Any]] = None, context_warning: Optional[str] = None):
         """Starts the microphone. mode = 'dictation' or 'smart_transform'."""
         if self._is_processing:
             logger.warning("[Engine] Currently processing — ignoring new recording request.")
@@ -66,8 +107,11 @@ class TruHandsFreeEngine:
         
         self.last_error = None
         self.pending_paste_text = None
+        self.context_warning = context_warning
+        self.captured_context = self._normalize_context(context)
         
         self._active_mode = mode
+        self._set_phase("recording")
         logger.info(f"[Engine] ▶ Starting recording — Mode: {mode.upper()}")
         
         config = self.config_manager.get_config()
@@ -92,6 +136,8 @@ class TruHandsFreeEngine:
             logger.error("[Engine] ✗ No audio was captured.")
             self._is_processing = False
             self._active_mode = None
+            self.last_error = "Recording failed: No audio was captured."
+            self._set_phase("error")
             return
 
         # Fire pipeline in background thread so we don't block
@@ -103,6 +149,7 @@ class TruHandsFreeEngine:
         try:
             # 2. Transcribe via STT
             config = self.config_manager.get_config()
+            self._set_phase("transcribing")
             logger.info(f"[Engine] Transcribing via {config.stt.provider}/{config.stt.model}...")
             transcript = self.stt_client.transcribe(
                 wav_path,
@@ -113,6 +160,7 @@ class TruHandsFreeEngine:
             if not transcript:
                 logger.error("[Engine] ✗ Transcription returned empty result.")
                 self.last_error = "Transcription failed: Empty result."
+                self._set_phase("error")
                 return
 
             logger.info(f"[Engine] ✓ Transcript: '{transcript}'")
@@ -125,11 +173,11 @@ class TruHandsFreeEngine:
             else:
                 # Smart transform — pass through LLM agent
                 skill_id = config.hotkeys.default_skill_id
+                self._set_phase("transforming")
                 logger.info(f"[Engine] Mode=SMART_TRANSFORM — sending to LLM Agent (skill: {skill_id})...")
-                # We don't have OS context anymore, so pass an empty dict
                 final_text = self.agent.process_transcript(
                     transcript, 
-                    {}, 
+                    self.captured_context,
                     skill_id
                 )
 
@@ -142,17 +190,26 @@ class TruHandsFreeEngine:
 
             # 4. Handoff to Electron
             # Store it so the frontend's 1-second /status poll will pick it up
+            self._set_phase("preparing_paste")
             self.pending_paste_text = final_text
             logger.info(f"[Engine] ✓ Text ready for Electron to paste ({len(final_text)} chars).")
 
         except Exception as e:
             logger.error(f"[Engine] ✗ Pipeline error: {e}", exc_info=True)
             self.last_error = f"Pipeline Error: {str(e)}"
+            self._set_phase("error")
         finally:
             elapsed = time.time() - pipeline_start
             self._is_processing = False
             self._active_mode = None
+            if self._phase not in {"preparing_paste", "error"}:
+                self._set_phase("ready")
             logger.info(f"[Engine] ✓ Pipeline complete in {elapsed:.2f}s. Ready for next request.")
+
+    def clear_pending_paste(self):
+        self.pending_paste_text = None
+        if not self.is_recording and not self._is_processing:
+            self._set_phase("ready")
 
     def shutdown(self):
         """Cleanly releases audio hardware and resources before destroying the engine."""

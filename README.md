@@ -6,7 +6,7 @@
 
 **macOS-native, LLM/STT provider-agnostic smart dictation and text transformation agent.**
 
-TruHandsFree bridges your speech into any active application, contextually adapting its output based on where you're typing — terminal, code editor, chat app, or browser.
+TruHandsFree bridges your speech into any active application and, in Smart Mode, adapts its output using the frontmost app name, window title, and supported browser tab metadata.
 
 ---
 
@@ -85,9 +85,11 @@ The Electron app will launch with:
 
 ### 5. macOS Permissions
 
-For hotkeys to work, you **must** grant **Accessibility** permission:
+For hotkeys and native paste to work, you **must** grant **Accessibility** permission:
 
 > System Settings → Privacy & Security → Accessibility → Enable your Terminal app (or TruHandsFree.app)
+
+For Smart Mode browser enrichment, macOS may also ask for **Automation** access the first time TruHandsFree tries to read the active browser tab title and hostname.
 
 ### 6. Build for Production
 
@@ -114,7 +116,7 @@ TruHandsFree natively registers global keyboard hooks. You do not need to have t
 | Hotkey | Mode | Pipeline |
 |--------|------|--------------------------------------------------|
 | `⌃ + D` <br> `⌘ + D` | **Pure Dictation** | Raw Speech → Whisper STT → Paste raw transcript |
-| `⌃ + T` <br> `⌘ + T` | **Smart Transform** | Speech → STT → LLM Agent + Custom Skills → Paste formatted text |
+| `⌃ + T` <br> `⌘ + T` | **Smart Transform** | Speech → STT → Smart Mode context (app/window + supported browser tab metadata) → LLM Agent + Custom Skills → Paste formatted text |
 
 Each hotkey acts as a **toggle**:
 1. Press `⌃ + D` once to **Start Recording**. A sound will chime, and the floating widget will pulse green.
@@ -126,12 +128,12 @@ Each hotkey acts as a **toggle**:
 
 ## 🧠 Smart Engine & Custom Skills
 
-The **Smart Transform (`⌃ + T`)** mode is context-aware. It actively reads which application you are currently typing in (e.g., "Code", "Slack", "Chrome") and applies **Custom Skills** to rewrite your text appropriately.
+The **Smart Transform (`⌃ + T`)** mode captures the frontmost app and window title when recording starts. If the target is a supported browser, it also captures the active tab title and site hostname. That context is then combined with your selected skill so the rewrite fits the destination more naturally.
 
 ### Adding Personal Skills
 Open the **Settings Window** by clicking the Gear (⚙️) icon on the floating widget, and navigate to the **Skills** tab.
 
-You can instruct the AI on exactly how to behave when you are using specific macOS apps.
+You can instruct the AI on exactly how to behave when Smart Mode detects specific macOS apps, windows, or supported browser destinations.
 
 #### Examples:
 1. **The Coder (For VS Code / Cursor)**
@@ -141,7 +143,7 @@ You can instruct the AI on exactly how to behave when you are using specific mac
 3. **The Translator (For WeChat / WhatsApp)**
    - *Prompt*: `If the active window is 'WeChat', translate the transcript entirely to conversational Spanish.`
 
-By defining application-specific skills, the Smart Engine anticipates *how* you want the text formatted before you even paste it.
+By defining context-specific skills, the Smart Engine anticipates *how* you want the text formatted before you even paste it. If context access is unavailable, Smart Mode falls back to transcript-only behavior instead of failing the recording.
 
 ---
 
@@ -154,7 +156,6 @@ TruHandsFree/
 │   ├── engine.py              # Dictation vs Smart orchestration
 │   ├── agent/                 # Langchain Supervisor + Skill Injection
 │   ├── audio/                 # sounddevice 16kHz microphone capture
-│   ├── os_interfaces/         # Quartz Window Tracking (macOS)
 │   └── security/              # 0o600 Encrypted Local Secrets 
 ├── frontend/                   # Electron + React + Vite
 │   ├── electron/main.ts       # macOS Tray App + nut-js Keystroke Injector
@@ -172,7 +173,8 @@ TruHandsFree/
 - **Local Secrets:** API keys are stored locally at `~/.truhandsfree/.env_secrets`. This file is strictly permissioned `chmod 600` (readable only by your exact macOS user profile) to bypass heavily-prompted macOS Keychain native access.
 - **Offline Triggers:** All global hotkeys (`Cmd/Ctrl+D`, `Cmd/Ctrl+T`) are processed entirely offline via Electron.
 - **IPC Safety:** Electron operates with `contextIsolation: true` and `nodeIntegration: false`. The React frontend cannot access native Node capabilities except through explicit, whitelisted `preload.ts` bridges.
-- **No Data Retention:** Trnscript data is held entirely in transient memory during processing and is immediately discarded after the `.nut-js` paste executes.
+- **Context Scope:** Smart Mode uses the frontmost app name, window title, and for supported browsers, the active tab title plus site hostname. It does not capture full page content and does not need the full URL.
+- **No Data Retention:** Transcript data is held entirely in transient memory during processing and is immediately discarded after the `.nut-js` paste executes.
 
 ---
 

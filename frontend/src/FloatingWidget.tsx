@@ -1,223 +1,296 @@
-import { useState, useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import axios from 'axios'
-import { VscSettingsGear } from 'react-icons/vsc'
+
+import { BrandedProgressLoader } from './components/BrandedProgressLoader'
+import { CheckIcon, ErrorIcon, MicIcon, SetupIcon, SparkIcon, WarningIcon } from './components/BrandIcons'
+import type { BackendBootState, BackendStatus, RecordingMode } from './types'
 
 const API_BASE = 'http://127.0.0.1:8055'
 
 type WidgetState = 'disconnected' | 'idle' | 'recording' | 'processing' | 'booting' | 'error_nokey'
-type ActiveMode = 'dictation' | 'smart_transform' | null
+
+const DEFAULT_BOOT_STATE: BackendBootState = {
+  phase: 'booting_backend',
+  label: 'Preparing TruHandsFree',
+  detail: 'Checking the local engine.',
+  progress: 20,
+}
 
 export const FloatingWidget = () => {
-    const [state, setState] = useState<WidgetState>('booting')
-    const [activeMode, setActiveMode] = useState<ActiveMode>(null)
-    const [amplitude, setAmplitude] = useState(0)
-    const [lastError, setLastError] = useState<string | null>(null)
-    const [isAccessibilityTrusted, setIsAccessibilityTrusted] = useState(true)
-    const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
-    const smoothedRef = useRef(0)
-    const startupTimeRef = useRef(Date.now())
-    const isFetchingRef = useRef(false)
+  const [widgetState, setWidgetState] = useState<WidgetState>('booting')
+  const [backendStatus, setBackendStatus] = useState<BackendStatus | null>(null)
+  const [bootState, setBootState] = useState<BackendBootState>(DEFAULT_BOOT_STATE)
+  const [amplitude, setAmplitude] = useState(0)
+  const [lastError, setLastError] = useState<string | null>(null)
+  const [isAccessibilityTrusted, setIsAccessibilityTrusted] = useState(true)
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const bootStateRef = useRef<BackendBootState>(DEFAULT_BOOT_STATE)
+  const smoothedRef = useRef(0)
+  const startupTimeRef = useRef(Date.now())
+  const isFetchingRef = useRef(false)
 
-    useEffect(() => {
-        const checkTCC = async () => {
-            if (window.windowControls?.checkAccessibility) {
-                const trusted = await window.windowControls.checkAccessibility()
-                setIsAccessibilityTrusted(trusted)
-            }
-        }
-        checkTCC()
-        const tccInterval = setInterval(checkTCC, 2000)
+  useEffect(() => {
+    let mounted = true
 
-        if (window.windowControls?.onPasteError) {
-            window.windowControls.onPasteError(() => {
-                setLastError('⚠️ Paste Failed (TCC Sandbox). Manually Cmd+V to paste.')
-            })
-        }
+    window.windowControls?.getBackendBootState?.().then((state) => {
+      if (mounted && state) {
+        bootStateRef.current = state
+        setBootState(state)
+      }
+    })
+    const disposeBoot = window.windowControls?.onBackendBootState?.((state) => {
+      if (mounted) {
+        bootStateRef.current = state
+        setBootState(state)
+      }
+    })
 
-        const pollStatus = async () => {
-            if (isFetchingRef.current) return
-            isFetchingRef.current = true
-
-            try {
-                const res = await axios.get(`${API_BASE}/status`, { timeout: 2000 })
-                // Update error state
-                setLastError(res.data.last_error || null)
-
-                // Check for pending paste
-                if (res.data.pending_paste_text) {
-                    if (window.windowControls?.simulatePaste) {
-                        window.windowControls.simulatePaste(res.data.pending_paste_text)
-                    }
-                    await axios.post(`${API_BASE}/status/clear_paste`)
-                }
-
-                if (res.data.missing_api_keys) {
-                    setState('error_nokey')
-                    setActiveMode(null)
-                    setAmplitude(0)
-                    smoothedRef.current = 0
-                } else if (res.data.is_recording) {
-                    setState('recording')
-                    setActiveMode(res.data.active_mode || 'dictation')
-                    // Smooth the amplitude for organic feel (exponential decay)
-                    const raw = res.data.audio_amplitude || 0
-                    smoothedRef.current = Math.max(raw, smoothedRef.current * 0.6)
-                    setAmplitude(smoothedRef.current)
-                } else if (res.data.is_processing) {
-                    setState('processing')
-                    setAmplitude(0)
-                    smoothedRef.current = 0
-                } else {
-                    setState('idle')
-                    setActiveMode(null)
-                    setAmplitude(0)
-                    smoothedRef.current = 0
-                }
-            } catch {
-                if (Date.now() - startupTimeRef.current < 10000) {
-                    setState('booting')
-                } else {
-                    setState('disconnected')
-                }
-            } finally {
-                isFetchingRef.current = false
-            }
-        }
-        pollStatus()
-        intervalRef.current = setInterval(pollStatus, 250)  // Polling every 250ms is fine for VU + paste check
-        return () => {
-            if (intervalRef.current) clearInterval(intervalRef.current)
-            clearInterval(tccInterval)
-        }
-    }, [])
-
-    const handleOpenSettings = () => {
-        window.windowControls?.showSettings()
+    const checkTCC = async () => {
+      const trusted = await window.windowControls?.checkAccessibility?.()
+      setIsAccessibilityTrusted(Boolean(trusted))
     }
 
-    const handlePromptPermissions = () => {
-        window.windowControls?.promptAccessibility()
-    }
+    checkTCC()
+    const tccInterval = setInterval(checkTCC, 2000)
 
-    const toggleRecording = async (mode: 'dictation' | 'smart_transform') => {
-        try {
-            await axios.post(`${API_BASE}/recording/toggle`, { mode })
-            setLastError(null) // Optimistically clear error on new action
-        } catch (e) {
-            console.error('Failed to toggle recording:', e)
+    const disposePaste = window.windowControls?.onPasteError?.(() => {
+      setLastError('Paste failed. Open Setup to confirm Accessibility is still allowed.')
+    })
+
+    const pollStatus = async () => {
+      if (isFetchingRef.current) return
+      isFetchingRef.current = true
+
+      try {
+        const res = await axios.get<BackendStatus>(`${API_BASE}/status`, { timeout: 2000 })
+        const status = res.data
+        setBackendStatus(status)
+        setLastError(status.last_error || null)
+
+        if (status.pending_paste_text) {
+          if (window.windowControls?.simulatePaste) {
+            window.windowControls.simulatePaste(status.pending_paste_text)
+          }
+          await axios.post(`${API_BASE}/status/clear_paste`)
         }
+
+        if (status.missing_api_keys) {
+          setWidgetState('error_nokey')
+          setAmplitude(0)
+          smoothedRef.current = 0
+        } else if (status.is_recording) {
+          setWidgetState('recording')
+          const raw = status.audio_amplitude || 0
+          smoothedRef.current = Math.max(raw, smoothedRef.current * 0.6)
+          setAmplitude(smoothedRef.current)
+        } else if (status.phase === 'transcribing' || status.phase === 'transforming' || status.phase === 'preparing_paste') {
+          setWidgetState('processing')
+          setAmplitude(0)
+          smoothedRef.current = 0
+        } else {
+          setWidgetState('idle')
+          setAmplitude(0)
+          smoothedRef.current = 0
+        }
+      } catch {
+        setBackendStatus(null)
+        if (Date.now() - startupTimeRef.current < 12000 || bootStateRef.current.phase === 'booting_backend') {
+          setWidgetState('booting')
+        } else {
+          setWidgetState('disconnected')
+        }
+      } finally {
+        isFetchingRef.current = false
+      }
     }
 
+    pollStatus()
+    intervalRef.current = setInterval(pollStatus, 300)
 
-    const stateConfig: Record<WidgetState, { label: string, color: string, glow: string }> = {
-        disconnected: { label: 'Offline', color: 'bg-white/30', glow: '' },
-        idle: { label: 'Ready', color: 'bg-semantic-success', glow: 'shadow-[0_0_8px_rgba(34,197,94,0.4)]' },
-        recording: { label: activeMode === 'smart_transform' ? 'Smart' : 'Dict', color: 'bg-semantic-error', glow: 'shadow-[0_0_12px_rgba(239,68,68,0.5)]' },
-        processing: { label: 'Processing', color: 'bg-semantic-warning', glow: 'shadow-[0_0_8px_rgba(245,158,11,0.4)]' },
-        booting: { label: 'Starting Engine...', color: 'bg-semantic-warning', glow: 'shadow-[0_0_8px_rgba(245,158,11,0.4)] animate-pulse' },
-        error_nokey: { label: 'KEY REQUIRED', color: 'bg-semantic-error', glow: 'shadow-[0_0_12px_rgba(239,68,68,0.5)] animate-pulse' },
+    return () => {
+      mounted = false
+      if (intervalRef.current) clearInterval(intervalRef.current)
+      clearInterval(tccInterval)
+      disposeBoot?.()
+      disposePaste?.()
     }
+  }, [])
 
-    const cfg = stateConfig[state]
-    const isRecording = state === 'recording'
+  const toggleRecording = async (mode: RecordingMode) => {
+    try {
+      await window.windowControls?.toggleRecording?.(mode)
+      setLastError(null)
+    } catch {
+      setLastError('Unable to reach the local backend. Open Setup and retry.')
+    }
+  }
 
-    // Generate bar heights from amplitude — each bar gets a slightly different height for organic look
-    const barMultipliers = [0.6, 0.9, 1.0, 0.85, 0.7]
-    const minHeight = 3  // px, silence
-    const maxHeight = 14 // px, max loudness
+  const contextSubtitle = backendStatus?.captured_context?.url_host
+    ? `${backendStatus.captured_context.app_name} • ${backendStatus.captured_context.url_host}`
+    : backendStatus?.captured_context?.app_name && backendStatus.captured_context.app_name !== 'Unknown'
+      ? backendStatus.captured_context.app_name
+      : bootState.detail
 
-    return (
-        <div className="relative w-full h-full">
-            {/* macOS Accessibility Permission Warning */}
-            {!isAccessibilityTrusted && (
-                <div className="absolute bottom-full mb-2 w-full animate-slide-up titlebar-nodrag z-50">
-                    <div
-                        onClick={handlePromptPermissions}
-                        className="mx-auto w-[95%] bg-semantic-error/95 backdrop-blur-md border border-semantic-error/50 text-white text-[10px] px-3 py-2 rounded-lg shadow-[0_0_15px_rgba(239,68,68,0.5)] text-center cursor-pointer hover:bg-semantic-error transition-colors"
-                    >
-                        <div className="font-bold mb-0.5">⚠️ Action Required</div>
-                        <div>Accessibility Permission missing. Click to open Settings.</div>
-                    </div>
-                </div>
-            )}
+  const isRecording = widgetState === 'recording'
+  const activeMode = backendStatus?.active_mode
+  const stateTone = widgetState === 'error_nokey'
+    ? 'text-semantic-warning'
+    : widgetState === 'disconnected'
+      ? 'text-semantic-error'
+      : 'text-accent-primary'
 
-            {/* Error Toast positioned above widget */}
-            {lastError && isAccessibilityTrusted && (
-                <div className="absolute bottom-full mb-2 w-full animate-slide-up">
-                    <div className="mx-auto w-[90%] bg-semantic-error/90 backdrop-blur-md border border-semantic-error/30 text-white text-[10px] px-3 py-1.5 rounded-lg shadow-lg text-center truncate pointer-events-none">
-                        ⚠️ {lastError}
-                    </div>
-                </div>
-            )}
+  const barMultipliers = [0.55, 0.85, 1, 0.82, 0.62]
+  const minHeight = 3
+  const maxHeight = 14
 
-            <div className="w-full h-full flex items-center justify-between px-3 bg-bg-app-base/95 backdrop-blur-xl rounded-full titlebar-drag">
-                {/* Status + VU Meter */}
-                <div className="flex items-center gap-2 titlebar-nodrag">
-                    {isRecording ? (
-                        <div className="flex items-center gap-[2px] h-4">
-                            {barMultipliers.map((mult, i) => {
-                                const barHeight = minHeight + (maxHeight - minHeight) * Math.min(amplitude * 3, 1) * mult
-                                return (
-                                    <div
-                                        key={i}
-                                        className={`w-[3px] rounded-full ${activeMode === 'smart_transform' ? 'bg-accent-primary' : 'bg-semantic-error'}`}
-                                        style={{
-                                            height: `${barHeight}px`,
-                                            transition: 'height 120ms ease-out',
-                                            opacity: amplitude > 0.005 ? 1 : 0.3,
-                                        }}
-                                    />
-                                )
-                            })}
-                        </div>
-                    ) : (
-                        <div className={`w-2 h-2 rounded-full transition-all duration-500 ${cfg.color} ${cfg.glow} ${state === 'processing' ? 'animate-subtle-pulse' : ''}`} />
-                    )}
-                    <span className="text-[11px] font-medium tracking-wide text-text-secondary">
-                        {cfg.label}
-                    </span>
-                </div>
-
-                {/* Action Buttons */}
-                <div className="flex items-center gap-1.5 titlebar-nodrag">
-                    {/* Dictation Button */}
-                    <button
-                        onClick={() => toggleRecording('dictation')}
-                        disabled={state === 'disconnected' || state === 'processing' || (isRecording && activeMode !== 'dictation')}
-                        className={`px-2.5 py-1 rounded-lg text-[10px] font-semibold tracking-wider uppercase transition-all duration-200 border
-                            ${isRecording && activeMode === 'dictation'
-                                ? 'bg-semantic-error/20 text-semantic-error border-semantic-error/40 animate-subtle-pulse'
-                                : 'bg-white/5 text-text-muted border-white/8 hover:bg-white/10 hover:text-white disabled:opacity-30'
-                            }`}
-                        title="Pure dictation — Ctrl+D"
-                    >
-                        {isRecording && activeMode === 'dictation' ? '■ Stop' : '● Dict (^D)'}
-                    </button>
-
-                    {/* Smart Transform Button */}
-                    <button
-                        onClick={() => toggleRecording('smart_transform')}
-                        disabled={state === 'disconnected' || state === 'processing' || (isRecording && activeMode !== 'smart_transform')}
-                        className={`px-2.5 py-1 rounded-lg text-[10px] font-semibold tracking-wider uppercase transition-all duration-200 border
-                            ${isRecording && activeMode === 'smart_transform'
-                                ? 'bg-accent-primary/20 text-accent-primary border-accent-primary/40 animate-subtle-pulse'
-                                : 'bg-white/5 text-text-muted border-white/8 hover:bg-white/10 hover:text-white disabled:opacity-30'
-                            }`}
-                        title="Smart transform — Ctrl+T"
-                    >
-                        {isRecording && activeMode === 'smart_transform' ? '■ Stop' : '✦ Smart (^T)'}
-                    </button>
-
-                    {/* Settings */}
-                    <button
-                        onClick={handleOpenSettings}
-                        className="w-6 h-6 rounded-full flex items-center justify-center text-text-muted hover:bg-white/10 hover:text-white transition-all duration-200"
-                        title="Settings"
-                    >
-                        <VscSettingsGear size={12} />
-                    </button>
-                </div>
+  return (
+    <div className="relative h-full w-full">
+      {!isAccessibilityTrusted ? (
+        <div className="absolute bottom-full mb-2 w-full">
+          <button
+            onClick={() => window.windowControls?.showSettings?.()}
+            className="titlebar-nodrag mx-auto flex w-[95%] items-start gap-3 rounded-2xl border border-semantic-warning/20 bg-[rgba(63,42,8,0.92)] px-3 py-3 text-left shadow-[0_12px_26px_rgba(0,0,0,0.25)]"
+          >
+            <WarningIcon size={16} className="mt-0.5 text-semantic-warning" />
+            <div>
+              <div className="text-[11px] font-semibold uppercase tracking-[0.26em] text-text-primary">Accessibility needed</div>
+              <div className="mt-1 text-[11px] leading-5 text-text-secondary">Open Setup to finish Accessibility access so paste and hotkeys keep working.</div>
             </div>
+          </button>
         </div>
-    )
+      ) : null}
+
+      {backendStatus?.context_warning && widgetState !== 'recording' ? (
+        <div className="absolute bottom-full mb-2 w-full">
+          <button
+            onClick={() => window.windowControls?.showSettings?.()}
+            className="titlebar-nodrag mx-auto flex w-[95%] items-start gap-3 rounded-2xl border border-semantic-warning/20 bg-[rgba(63,42,8,0.92)] px-3 py-3 text-left shadow-[0_12px_26px_rgba(0,0,0,0.25)]"
+          >
+            <WarningIcon size={16} className="mt-0.5 text-semantic-warning" />
+            <div>
+              <div className="text-[11px] font-semibold uppercase tracking-[0.26em] text-text-primary">Smart Mode fallback</div>
+              <div className="mt-1 text-[11px] leading-5 text-text-secondary">{backendStatus.context_warning}</div>
+            </div>
+          </button>
+        </div>
+      ) : null}
+
+      {lastError && isAccessibilityTrusted ? (
+        <div className="absolute bottom-full mb-2 w-full">
+          <div className="mx-auto flex w-[90%] items-start gap-3 rounded-2xl border border-semantic-error/20 bg-[rgba(55,14,22,0.94)] px-3 py-2.5 text-left shadow-lg">
+            <ErrorIcon size={16} className="mt-0.5 text-semantic-error" />
+            <div className="truncate text-[11px] leading-5 text-text-secondary">{lastError}</div>
+          </div>
+        </div>
+      ) : null}
+
+      <div className="titlebar-drag flex h-full items-center justify-between rounded-full border border-white/8 bg-[linear-gradient(180deg,rgba(7,20,31,0.96),rgba(3,11,18,0.94))] px-3 shadow-[0_18px_40px_rgba(0,0,0,0.32)]">
+        <div className="titlebar-nodrag min-w-0 flex-1">
+          {widgetState === 'booting' ? (
+            <BrandedProgressLoader
+              compact
+              title={bootState.label}
+              subtitle={bootState.detail}
+              progress={bootState.progress}
+            />
+          ) : widgetState === 'processing' ? (
+            <BrandedProgressLoader
+              compact
+              title={backendStatus?.phase_label || 'Preparing Smart Mode'}
+              subtitle={contextSubtitle}
+            />
+          ) : (
+            <div className="flex items-center gap-3">
+              {isRecording ? (
+                <div className="flex h-4 items-center gap-[3px]">
+                  {barMultipliers.map((multiplier, index) => {
+                    const barHeight = minHeight + (maxHeight - minHeight) * Math.min(amplitude * 3, 1) * multiplier
+                    return (
+                      <div
+                        key={index}
+                        className={`w-[3px] rounded-full transition-[height] duration-150 ${
+                          activeMode === 'smart_transform' ? 'bg-accent-primary shadow-[0_0_8px_rgba(18,222,230,0.35)]' : 'bg-semantic-success'
+                        }`}
+                        style={{
+                          height: `${barHeight}px`,
+                          opacity: amplitude > 0.005 ? 1 : 0.35,
+                        }}
+                      />
+                    )
+                  })}
+                </div>
+              ) : (
+                <div className={`flex h-9 w-9 items-center justify-center rounded-2xl border border-white/8 bg-white/[0.03] ${stateTone}`}>
+                  {widgetState === 'error_nokey' ? <WarningIcon size={16} /> : widgetState === 'disconnected' ? <ErrorIcon size={16} /> : <CheckIcon size={16} />}
+                </div>
+              )}
+
+              <div className="min-w-0">
+                <div className="truncate text-xs font-semibold uppercase tracking-[0.26em] text-text-secondary">
+                  {widgetState === 'error_nokey'
+                    ? 'Keys required'
+                    : widgetState === 'disconnected'
+                      ? 'Offline'
+                      : isRecording
+                        ? activeMode === 'smart_transform'
+                          ? 'Smart Mode listening'
+                          : 'Dictation listening'
+                        : 'Ready'}
+                </div>
+                <div className="truncate text-sm text-text-primary">
+                  {widgetState === 'error_nokey'
+                    ? 'Add the required provider keys in Setup.'
+                    : widgetState === 'disconnected'
+                      ? 'The local engine is unavailable.'
+                      : isRecording
+                        ? contextSubtitle
+                        : backendStatus?.captured_context?.app_name && backendStatus.captured_context.app_name !== 'Unknown'
+                          ? `Target: ${backendStatus.captured_context.app_name}`
+                          : 'Trigger dictation or Smart Mode from anywhere.'}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="titlebar-nodrag ml-3 flex items-center gap-1.5">
+          <button
+            onClick={() => toggleRecording('dictation')}
+            disabled={widgetState === 'disconnected' || widgetState === 'processing' || (isRecording && activeMode !== 'dictation')}
+            className={`inline-flex items-center gap-1.5 rounded-2xl border px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-[0.24em] transition-all disabled:cursor-not-allowed disabled:opacity-35 ${
+              isRecording && activeMode === 'dictation'
+                ? 'border-semantic-success/20 bg-semantic-success/12 text-semantic-success'
+                : 'border-white/8 bg-white/[0.03] text-text-muted hover:bg-white/[0.06] hover:text-text-primary'
+            }`}
+            title="Pure Dictation — Ctrl+D / Cmd+D"
+          >
+            <MicIcon size={12} />
+            {isRecording && activeMode === 'dictation' ? 'Stop' : 'Dict'}
+          </button>
+
+          <button
+            onClick={() => toggleRecording('smart_transform')}
+            disabled={widgetState === 'disconnected' || widgetState === 'processing' || (isRecording && activeMode !== 'smart_transform')}
+            className={`inline-flex items-center gap-1.5 rounded-2xl border px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-[0.24em] transition-all disabled:cursor-not-allowed disabled:opacity-35 ${
+              isRecording && activeMode === 'smart_transform'
+                ? 'border-accent-primary/20 bg-accent-primary/12 text-accent-primary'
+                : 'border-white/8 bg-white/[0.03] text-text-muted hover:bg-white/[0.06] hover:text-text-primary'
+            }`}
+            title="Smart Transform — Ctrl+T / Cmd+T"
+          >
+            <SparkIcon size={12} />
+            {isRecording && activeMode === 'smart_transform' ? 'Stop' : 'Smart'}
+          </button>
+
+          <button
+            onClick={() => window.windowControls?.showSettings?.()}
+            className="flex h-8 w-8 items-center justify-center rounded-2xl border border-white/8 bg-white/[0.03] text-text-muted transition-all hover:bg-white/[0.06] hover:text-text-primary"
+            title="Open Setup"
+          >
+            <SetupIcon size={13} />
+          </button>
+        </div>
+      </div>
+    </div>
+  )
 }
