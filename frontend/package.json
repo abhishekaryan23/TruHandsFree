@@ -1,27 +1,39 @@
 {
   "name": "frontend",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.1",
   "type": "module",
   "main": "dist-electron/main.js",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build && electron-builder",
+    "prepare:mac-assets": "bash ../scripts/prepare-mac-assets.sh",
+    "build": "npm run prepare:mac-assets && tsc -b && vite build && electron-builder",
+    "build:mac": "npm run prepare:mac-assets && tsc -b && vite build && electron-builder --mac dmg --arm64",
     "lint": "eslint .",
     "preview": "vite preview"
   },
   "build": {
     "appId": "com.truhandsfree.app",
     "productName": "TruHandsFree",
+    "afterPack": "scripts/after-pack.mjs",
+    "afterSign": "scripts/notarize.mjs",
     "mac": {
-      "target": "dmg",
-      "icon": "build/icon.png",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64"
+          ]
+        }
+      ],
+      "icon": "build/icon.icns",
       "category": "public.app-category.productivity",
       "hardenedRuntime": true,
       "gatekeeperAssess": false,
       "entitlements": "build/entitlements.mac.plist",
-      "entitlementsInherit": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.inherit.plist",
       "extendInfo": {
+        "LSUIElement": true,
         "NSMicrophoneUsageDescription": "TruHandsFree needs microphone access to transcribe your speech.",
         "NSAppleEventsUsageDescription": "TruHandsFree uses Automation to read the frontmost app and supported browser tab metadata for Smart Mode."
       }
@@ -64,6 +76,7 @@
     "zustand": "^5.0.11"
   },
   "devDependencies": {
+    "@electron/notarize": "^3.1.1",
     "@eslint/js": "^9.39.1",
     "@tailwindcss/vite": "^4.2.1",
     "@types/node": "^24.10.1",

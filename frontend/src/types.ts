@@ -1,4 +1,12 @@
 export type RecordingMode = 'dictation' | 'smart_transform'
+export type WidgetPresentationSource = 'tray' | 'hotkey' | 'idle'
+export type PrivacyPane = 'microphone' | 'accessibility' | 'automation'
+export type MicrophonePermissionStatus = 'granted' | 'denied' | 'not-determined' | 'restricted' | 'unknown'
+
+export interface WidgetPresentationCommand {
+  visible: boolean
+  source: WidgetPresentationSource
+}
 
 export type BackendPhase =
   | 'booting_backend'
@@ -17,6 +25,8 @@ export interface SmartContext {
   url_host: string | null
 }
 
+export type CapturedContextQuality = 'full' | 'app_only' | 'transcript_only' | 'empty'
+
 export interface SmartContextAccessStatus {
   status: 'full' | 'app-only' | 'unavailable'
   message: string
@@ -28,6 +38,20 @@ export interface BackendBootState {
   label: string
   detail: string
   progress: number | null
+}
+
+export interface AppLaunchContext {
+  is_packaged: boolean
+  backend_base_url: string
+  app_version: string
+  install_location: 'applications' | 'disk_image' | 'other' | 'development'
+  should_prompt_move_to_applications: boolean
+  onboarding_completed: boolean
+  onboarding_dismissed: boolean
+  log_paths: {
+    backend: string
+    electron: string
+  }
 }
 
 export interface ProviderOption {
@@ -47,9 +71,42 @@ export interface ProviderModels {
 }
 
 export interface AudioDevice {
-  id: number
-  name: string
-  channels: number
+  id: string
+  label: string
+  is_default: boolean
+  group_id: string | null
+}
+
+export interface MicrophoneAccessInfo {
+  status: MicrophonePermissionStatus
+  source: 'electron'
+}
+
+export interface CaptureState {
+  is_recording: boolean
+  is_testing: boolean
+  mode: RecordingMode | 'mic_test' | null
+  amplitude: number
+  error: string | null
+  active_device_id: string | null
+  active_device_label: string | null
+  fallback_to_default: boolean
+  fallback_notice: string | null
+}
+
+export interface CaptureStopResult {
+  status: 'success' | 'error'
+  audio_base64?: string
+  error?: string
+  capture_stats?: {
+    duration_ms: number
+    peak: number
+    rms: number
+    used_device_id: string | null
+    used_device_label: string | null
+    fallback_to_default: boolean
+    fallback_notice: string | null
+  }
 }
 
 export interface Skill {
@@ -77,6 +134,12 @@ export interface AppConfig {
   }
   audio: {
     input_device: string | null
+    input_device_id: string | null
+    input_device_label: string | null
+  }
+  debug: {
+    log_sensitive_transcripts: boolean
+    persist_recordings: boolean
   }
 }
 
@@ -93,5 +156,8 @@ export interface BackendStatus {
   phase: BackendPhase
   phase_label: string
   captured_context: SmartContext
+  captured_context_at: string | null
+  captured_context_quality: CapturedContextQuality
+  target_type: string | null
   context_warning: string | null
 }

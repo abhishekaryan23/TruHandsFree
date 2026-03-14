@@ -1,7 +1,7 @@
 # TruHandsFree
 
 <p align="center">
-  <img src="assets/logo.png" width="128" alt="TruHandsFree Logo">
+  <img src="assets/logo.png" width="128" alt="TruHandsFree icon">
 </p>
 
 **macOS-native, LLM/STT provider-agnostic smart dictation and text transformation agent.**
@@ -50,7 +50,7 @@ npm install
 
 ### 3. Set Your API Keys
 
-TruHandsFree stores API keys in your **macOS Keychain** (never in plaintext files). You can set them via the Settings UI or via the API:
+TruHandsFree stores API keys locally under `~/.truhandsfree/.env_secrets` with user-only permissions. You can set them via the Preferences UI or via the API:
 
 ```bash
 # Start the backend first
@@ -80,8 +80,8 @@ npm run dev
 ```
 
 The Electron app will launch with:
-- A **floating widget** (bottom-left) showing recording status
-- A **settings window** (click ⚙️ on the widget) for configuration
+- A **floating widget** attached near the top-center of the screen
+- A **Preferences window** (click the settings control on the widget) for configuration
 
 ### 5. macOS Permissions
 
@@ -91,19 +91,32 @@ For hotkeys and native paste to work, you **must** grant **Accessibility** permi
 
 For Smart Mode browser enrichment, macOS may also ask for **Automation** access the first time TruHandsFree tries to read the active browser tab title and hostname.
 
+If you deny any of these prompts, reopen **Preferences → Permissions**. The app keeps retry buttons and the macOS recovery path in that section so users do not need to dig through logs first.
+
 ### 6. Build for Production
 
 ```bash
-cd frontend
-npm run build
+bash scripts/build-mac.sh
 ```
 
-The automated `build-mac.sh` script produces the standalone `.dmg` installer.
-For your convenience, the latest compiled builds are hosted directly on the **GitHub Releases** page.
-- Navigate to the **Releases** section on the right sidebar of the GitHub repository.
-- Download `TruHandsFree-0.0.0-arm64.dmg`.
+The release build is configured for **Apple Silicon only** and produces a menu bar-first `.dmg`.
 
-To install, simply double-click the `.dmg`, drag the app to your `Applications` folder, and grant macOS Accessibility permissions on first launch!
+Recommended signing and notarization environment:
+
+```bash
+export APPLE_SIGNING_IDENTITY="Developer ID Application: Your Company (TEAMID)"
+export APPLE_ID="you@example.com"
+export APPLE_APP_SPECIFIC_PASSWORD="xxxx-xxxx-xxxx-xxxx"
+export APPLE_TEAM_ID="TEAMID"
+```
+
+The first packaged release flow is:
+1. Build the backend with PyInstaller `onedir`
+2. Generate the macOS icon assets
+3. Build the Electron app as an arm64 DMG
+4. Sign and notarize when the Apple credentials above are present
+
+For end users, installation is a normal drag-to-Applications flow from the DMG. On first launch, TruHandsFree opens Preferences automatically and starts in the Permissions section so microphone, Accessibility, browser-context guidance, and provider keys are handled in one place.
 
 ---
 
@@ -152,7 +165,7 @@ By defining context-specific skills, the Smart Engine anticipates *how* you want
 ```
 TruHandsFree/
 ├── backend/                    # Python FastAPI engine
-│   ├── server.py              # REST API (port 8055, controls pipeline)
+│   ├── server.py              # REST API (dynamic loopback port, controls pipeline)
 │   ├── engine.py              # Dictation vs Smart orchestration
 │   ├── agent/                 # Langchain Supervisor + Skill Injection
 │   ├── audio/                 # sounddevice 16kHz microphone capture
@@ -170,17 +183,17 @@ TruHandsFree/
 
 ## Security & Privacy Model
 
-- **Local Secrets:** API keys are stored locally at `~/.truhandsfree/.env_secrets`. This file is strictly permissioned `chmod 600` (readable only by your exact macOS user profile) to bypass heavily-prompted macOS Keychain native access.
+- **Local Secrets:** API keys are stored locally at `~/.truhandsfree/.env_secrets`. This file is strictly permissioned `chmod 600` (readable only by your exact macOS user profile).
 - **Offline Triggers:** All global hotkeys (`Cmd/Ctrl+D`, `Cmd/Ctrl+T`) are processed entirely offline via Electron.
 - **IPC Safety:** Electron operates with `contextIsolation: true` and `nodeIntegration: false`. The React frontend cannot access native Node capabilities except through explicit, whitelisted `preload.ts` bridges.
 - **Context Scope:** Smart Mode uses the frontmost app name, window title, and for supported browsers, the active tab title plus site hostname. It does not capture full page content and does not need the full URL.
-- **No Data Retention:** Transcript data is held entirely in transient memory during processing and is immediately discarded after the `.nut-js` paste executes.
+- **No Data Retention By Default:** Transcript data stays in memory during processing. Sensitive transcript logging and WAV retention are both opt-in debug features.
 
 ---
 
 ## Debugging
 
-Audio recordings generated during local development are kept in `~/.truhandsfree/recordings/` with timestamps for debugging. The engine automatically purges old files, keeping only the 50 most recent debug captures to prevent disk bloat.
+Debug audio recordings are only kept when Debug STT recording retention is enabled in Preferences.
 
 Detailed execution logs are aggregated locally at:
 `~/.truhandsfree/logs/electron.log`

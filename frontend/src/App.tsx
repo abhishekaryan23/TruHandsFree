@@ -1,75 +1,97 @@
+import { useEffect, useState } from 'react'
 import { HashRouter, NavLink, Route, Routes } from 'react-router-dom'
 
+import CaptureHost from './CaptureHost'
 import { FloatingWidget } from './FloatingWidget'
 import { SetupIcon, SkillsIcon, WindowCloseIcon, WindowMinimizeIcon, BrandMark } from './components/BrandIcons'
 import { SettingsView } from './SettingsView'
 import { SkillsManager } from './SkillsManager'
 
 function AppShell() {
+  const [platform, setPlatform] = useState('darwin')
   const handleMinimize = () => window.windowControls?.minimize()
   const handleClose = () => window.windowControls?.close()
+  const isMac = platform === 'darwin'
+
+  useEffect(() => {
+    let mounted = true
+
+    window.windowControls?.getPlatform?.().then((nextPlatform) => {
+      if (mounted && nextPlatform) {
+        setPlatform(nextPlatform)
+      }
+    })
+
+    return () => {
+      mounted = false
+    }
+  }, [])
 
   return (
-    <div className="flex h-full w-full flex-col overflow-hidden rounded-[26px] border border-white/8 bg-[linear-gradient(180deg,rgba(6,15,24,0.98),rgba(3,9,15,0.96))] shadow-[0_32px_80px_rgba(0,0,0,0.45)]">
-      <div className="titlebar-drag relative flex h-12 items-center justify-between border-b border-white/6 bg-[linear-gradient(180deg,rgba(10,24,35,0.88),rgba(5,14,22,0.72))] px-4">
-        <div className="flex items-center gap-3">
-          <div className="flex h-8 w-8 items-center justify-center rounded-2xl border border-accent-primary/20 bg-accent-primary/10 text-accent-primary shadow-[0_0_20px_rgba(18,222,230,0.2)]">
-            <BrandMark size={18} />
+    <div className="workspace-shell flex h-full w-full flex-col overflow-hidden">
+      <div className="workspace-titlebar soft-divider border-b">
+        <div className={`titlebar-drag flex h-[74px] items-center justify-between gap-4 pr-4 ${isMac ? 'pl-[88px]' : 'px-4'}`}>
+          <div className="flex min-w-0 items-center gap-3">
+            <div className="workspace-brand-chip flex h-10 w-10 items-center justify-center rounded-[14px]">
+              <BrandMark size={24} />
+            </div>
+            <div className="min-w-0">
+              <div className="truncate text-[15px] font-semibold tracking-[-0.02em] text-text-primary">TruHandsFree</div>
+              <div className="truncate text-[11px] text-text-secondary">Voice workspace for Dictation and Smart Mode</div>
+            </div>
           </div>
-          <div>
-            <div className="text-sm font-semibold tracking-tight text-text-primary">TruHandsFree</div>
-            <div className="text-[10px] uppercase tracking-[0.26em] text-text-muted">Voice Workspace</div>
+
+          <div className="titlebar-nodrag flex items-center gap-3">
+            <div className="workspace-segmented flex items-center gap-1 rounded-full p-1">
+              <NavLink
+                to="/"
+                end
+                className={({ isActive }) =>
+                  `inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition-colors ${
+                    isActive
+                      ? 'workspace-tab-active text-text-primary'
+                      : 'workspace-tab text-text-secondary hover:text-text-primary'
+                  }`
+                }
+              >
+                <SetupIcon size={16} />
+                Setup
+              </NavLink>
+
+              <NavLink
+                to="/skills"
+                className={({ isActive }) =>
+                  `inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition-colors ${
+                    isActive
+                      ? 'workspace-tab-active text-text-primary'
+                      : 'workspace-tab text-text-secondary hover:text-text-primary'
+                  }`
+                }
+              >
+                <SkillsIcon size={16} />
+                Skills
+              </NavLink>
+            </div>
+
+            {!isMac ? (
+              <div className="flex items-center gap-1.5">
+                <button
+                  onClick={handleMinimize}
+                  className="flex h-8 w-8 items-center justify-center rounded-xl text-text-muted transition-colors hover:bg-white/8 hover:text-text-primary"
+                  title="Minimize"
+                >
+                  <WindowMinimizeIcon size={14} />
+                </button>
+                <button
+                  onClick={handleClose}
+                  className="flex h-8 w-8 items-center justify-center rounded-xl text-text-muted transition-colors hover:bg-semantic-error/20 hover:text-white"
+                  title="Close"
+                >
+                  <WindowCloseIcon size={14} />
+                </button>
+              </div>
+            ) : null}
           </div>
-        </div>
-
-        <div className="titlebar-nodrag flex items-center gap-1.5">
-          <button
-            onClick={handleMinimize}
-            className="flex h-8 w-8 items-center justify-center rounded-xl text-text-muted transition-colors hover:bg-white/8 hover:text-text-primary"
-            title="Minimize"
-          >
-            <WindowMinimizeIcon size={14} />
-          </button>
-          <button
-            onClick={handleClose}
-            className="flex h-8 w-8 items-center justify-center rounded-xl text-text-muted transition-colors hover:bg-semantic-error/20 hover:text-white"
-            title="Close"
-          >
-            <WindowCloseIcon size={14} />
-          </button>
-        </div>
-      </div>
-
-      <div className="border-b border-white/6 px-4 py-3">
-        <div className="titlebar-nodrag flex items-center gap-2">
-          <NavLink
-            to="/"
-            end
-            className={({ isActive }) =>
-              `inline-flex items-center gap-2 rounded-2xl border px-4 py-2 text-sm font-medium transition-all ${
-                isActive
-                  ? 'border-accent-primary/25 bg-accent-primary/12 text-accent-primary shadow-[0_0_20px_rgba(18,222,230,0.12)]'
-                  : 'border-white/6 bg-white/[0.02] text-text-secondary hover:border-white/10 hover:bg-white/[0.04] hover:text-text-primary'
-              }`
-            }
-          >
-            <SetupIcon size={16} />
-            Setup
-          </NavLink>
-
-          <NavLink
-            to="/skills"
-            className={({ isActive }) =>
-              `inline-flex items-center gap-2 rounded-2xl border px-4 py-2 text-sm font-medium transition-all ${
-                isActive
-                  ? 'border-accent-primary/25 bg-accent-primary/12 text-accent-primary shadow-[0_0_20px_rgba(18,222,230,0.12)]'
-                  : 'border-white/6 bg-white/[0.02] text-text-secondary hover:border-white/10 hover:bg-white/[0.04] hover:text-text-primary'
-              }`
-            }
-          >
-            <SkillsIcon size={16} />
-            Skills
-          </NavLink>
         </div>
       </div>
 
@@ -88,6 +110,7 @@ function App() {
     <HashRouter>
       <Routes>
         <Route path="/widget" element={<FloatingWidget />} />
+        <Route path="/capture" element={<CaptureHost />} />
         <Route path="/*" element={<AppShell />} />
       </Routes>
     </HashRouter>

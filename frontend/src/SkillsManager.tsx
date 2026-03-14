@@ -3,9 +3,26 @@ import axios from 'axios'
 
 import { BrandedProgressLoader } from './components/BrandedProgressLoader'
 import { CheckIcon, ErrorIcon, KeyIcon, SkillsIcon, SparkIcon, WarningIcon, WindowCloseIcon } from './components/BrandIcons'
+import { apiDelete, apiGet, apiPost } from './lib/api'
 import type { Skill } from './types'
 
-const API_BASE = 'http://127.0.0.1:8055'
+function getErrorMessage(error: unknown, fallback: string) {
+  if (axios.isAxiosError(error)) {
+    const detail = error.response?.data
+    if (typeof detail === 'string' && detail.trim()) return detail
+    if (detail && typeof detail === 'object') {
+      const message = 'detail' in detail
+        ? detail.detail
+        : 'message' in detail
+          ? detail.message
+          : null
+      if (typeof message === 'string' && message.trim()) return message
+    }
+  }
+
+  if (error instanceof Error && error.message.trim()) return error.message
+  return fallback
+}
 
 function Banner({
   tone,
@@ -42,7 +59,7 @@ export const SkillsManager = () => {
   const fetchSkills = async () => {
     setLoading(true)
     try {
-      const res = await axios.get<{ skills: Skill[] }>(`${API_BASE}/skills`)
+      const res = await apiGet<{ skills: Skill[] }>('/skills')
       setSkills(res.data.skills || [])
     } catch {
       setBanner({ tone: 'error', message: 'Failed to load the current skill library.' })
@@ -55,7 +72,7 @@ export const SkillsManager = () => {
     if (!newId || !newName || !newPrompt) return
 
     try {
-      await axios.post(`${API_BASE}/skills`, {
+      await apiPost('/skills', {
         id: newId,
         name: newName,
         prompt: newPrompt,
@@ -66,8 +83,8 @@ export const SkillsManager = () => {
       setNewPrompt('')
       setBanner({ tone: 'success', message: `Saved "${newName}" for Smart Mode.` })
       await fetchSkills()
-    } catch (error: any) {
-      setBanner({ tone: 'error', message: error?.response?.data?.detail || 'Failed to save the skill. Choose a unique ID and try again.' })
+    } catch (error: unknown) {
+      setBanner({ tone: 'error', message: getErrorMessage(error, 'Failed to save the skill. Choose a unique ID and try again.') })
     }
   }
 
@@ -75,12 +92,12 @@ export const SkillsManager = () => {
     if (!pendingDelete) return
 
     try {
-      await axios.delete(`${API_BASE}/skills/${pendingDelete.id}`)
+      await apiDelete(`/skills/${pendingDelete.id}`)
       setBanner({ tone: 'success', message: `Deleted "${pendingDelete.name}".` })
       setPendingDelete(null)
       await fetchSkills()
-    } catch (error: any) {
-      setBanner({ tone: 'error', message: error?.response?.data?.detail || 'Failed to delete that skill.' })
+    } catch (error: unknown) {
+      setBanner({ tone: 'error', message: getErrorMessage(error, 'Failed to delete that skill.') })
     }
   }
 

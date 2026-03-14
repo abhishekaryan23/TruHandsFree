@@ -23,6 +23,10 @@ class ConfigManager:
 
     def _ensure_config_exists(self):
         self.CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+        try:
+            os.chmod(self.CONFIG_DIR, 0o700)
+        except OSError:
+            pass
         if not self.CONFIG_FILE.exists():
             default_config = AppConfig()
             self._save_raw(default_config.model_dump())
@@ -31,6 +35,10 @@ class ConfigManager:
         try:
             with open(self.CONFIG_FILE, 'w') as f:
                 json.dump(data, f, indent=4)
+            try:
+                os.chmod(self.CONFIG_FILE, 0o600)
+            except OSError:
+                pass
         except Exception as e:
             print(f"[ConfigManager] Failed to save config to disk: {e}")
 
