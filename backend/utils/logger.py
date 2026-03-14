@@ -23,6 +23,10 @@ class LoggerSetup:
             return logging.getLogger("TruHandsFree")
             
         cls.LOG_DIR.mkdir(parents=True, exist_ok=True)
+        try:
+            os.chmod(cls.LOG_DIR, 0o700)
+        except OSError:
+            pass
         
         logger = logging.getLogger("TruHandsFree")
         logger.setLevel(logging.DEBUG)
@@ -36,6 +40,10 @@ class LoggerSetup:
         file_handler = RotatingFileHandler(
             cls.LOG_FILE, maxBytes=5*1024*1024, backupCount=3
         )
+        try:
+            os.chmod(cls.LOG_FILE, 0o600)
+        except OSError:
+            pass
         file_handler.setFormatter(formatter)
         file_handler.setLevel(logging.DEBUG)
         

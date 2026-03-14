@@ -1,8 +1,9 @@
 import requests
 import time
+import os
 
 def test_api():
-    base_url = "http://127.0.0.1:8055"
+    base_url = os.environ.get("TRUHANDSFREE_BACKEND_URL", "http://127.0.0.1:8055")
     print("Testing Backend API Endpoints...")
     time.sleep(2) # Give server time to boot
 

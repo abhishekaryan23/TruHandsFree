@@ -38,7 +38,7 @@ class SkillManager:
             self._skills = DefaultSkills.get_defaults()
 
     def get_all_skills(self) -> List[Dict[str, Any]]:
-        return self._skills
+        return list(self._skills)
 
     def get_skill(self, skill_id: str) -> Optional[Dict[str, Any]]:
         for skill in self._skills:

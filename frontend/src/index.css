@@ -1,22 +1,24 @@
 @import "tailwindcss";
 
 @theme {
-  --font-sans: 'Inter', 'SF Pro Display', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-sans: 'SF Pro Text', 'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Avenir Next', 'Inter', system-ui, "Segoe UI", sans-serif;
   --font-mono: 'JetBrains Mono', 'SF Mono', 'Fira Code', monospace;
 
-  --color-bg-app-base: hsl(220, 20%, 4%);
-  --color-bg-surface-elevated: hsl(220, 20%, 10%);
-  --color-bg-surface-glass: rgba(255, 255, 255, 0.03);
+  --color-bg-app-base: hsl(203, 58%, 5%);
+  --color-bg-surface-elevated: hsl(206, 42%, 10%);
+  --color-bg-surface-glass: rgba(255, 255, 255, 0.035);
 
-  --color-text-primary: hsl(220, 10%, 95%);
-  --color-text-secondary: hsl(220, 10%, 65%);
-  --color-text-muted: hsl(220, 10%, 40%);
+  --color-text-primary: hsl(191, 22%, 94%);
+  --color-text-secondary: hsl(198, 16%, 70%);
+  --color-text-muted: hsl(198, 10%, 45%);
 
-  --color-accent-primary: hsl(250, 85%, 65%);
+  --color-accent-primary: hsl(184, 86%, 49%);
+  --color-accent-secondary: hsl(190, 93%, 74%);
+  --color-accent-tertiary: hsl(197, 54%, 26%);
 
-  --color-semantic-success: hsl(150, 80%, 40%);
-  --color-semantic-error: hsl(350, 80%, 55%);
-  --color-semantic-warning: hsl(35, 90%, 55%);
+  --color-semantic-success: hsl(148, 67%, 44%);
+  --color-semantic-error: hsl(351, 89%, 64%);
+  --color-semantic-warning: hsl(41, 95%, 60%);
 }
 
 @layer base {
@@ -28,7 +30,9 @@
     width: 100vw;
     height: 100vh;
     overflow: hidden;
-    background-color: transparent;
+    background:
+      radial-gradient(circle at top, rgba(18, 222, 230, 0.12), transparent 35%),
+      linear-gradient(180deg, rgba(4, 12, 19, 1), rgba(2, 7, 12, 1));
     color: var(--color-text-primary);
     font-family: var(--font-sans);
     user-select: none;
@@ -42,6 +46,11 @@
     display: flex;
     flex-direction: column;
     background-color: transparent;
+  }
+
+  html[data-surface="widget"],
+  body[data-surface="widget"] {
+    background: transparent;
   }
 
   input,
@@ -85,7 +94,179 @@
   }
 
   .glass-card {
-    @apply bg-bg-surface-elevated/70 backdrop-blur-md border border-white/5 rounded-xl;
+    @apply rounded-[24px] border border-white/7 bg-[linear-gradient(180deg,rgba(18,24,32,0.76),rgba(10,16,23,0.88))] backdrop-blur-xl shadow-[0_18px_40px_rgba(0,0,0,0.14)];
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.08),
+      inset 0 0 20px rgba(255, 255, 255, 0.025),
+      0 18px 40px rgba(0, 0, 0, 0.14);
+  }
+
+  .workspace-shell {
+    background:
+      radial-gradient(circle at top, rgba(160, 214, 255, 0.08), transparent 36%),
+      linear-gradient(180deg, rgba(15, 20, 27, 0.92), rgba(10, 14, 19, 0.96));
+    backdrop-filter: blur(24px) saturate(140%);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.06),
+      inset 0 -1px 0 rgba(255, 255, 255, 0.03);
+  }
+
+  .workspace-titlebar {
+    background:
+      linear-gradient(180deg, rgba(29, 35, 43, 0.72), rgba(16, 21, 29, 0.68));
+    backdrop-filter: blur(28px) saturate(155%);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.07),
+      inset 0 -1px 0 rgba(255, 255, 255, 0.035);
+  }
+
+  .workspace-brand-chip {
+    background: transparent;
+    box-shadow: none;
+  }
+
+  .workspace-segmented {
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.018)),
+      rgba(11, 16, 23, 0.42);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.06),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.22);
+  }
+
+  .workspace-tab {
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.028), rgba(255, 255, 255, 0.012)),
+      rgba(255, 255, 255, 0);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+  }
+
+  .workspace-tab-active {
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.15), rgba(255, 255, 255, 0.06)),
+      rgba(255, 255, 255, 0.03);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.08),
+      0 8px 20px rgba(0, 0, 0, 0.1);
+  }
+
+  .settings-sidebar {
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.02)),
+      rgba(12, 18, 25, 0.36);
+    backdrop-filter: blur(24px) saturate(145%);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.05),
+      inset -1px 0 0 rgba(255, 255, 255, 0.03);
+  }
+
+  .settings-content-shell {
+    background:
+      linear-gradient(180deg, rgba(19, 25, 33, 0.72), rgba(10, 15, 21, 0.88));
+    backdrop-filter: blur(26px) saturate(145%);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.06),
+      0 18px 40px rgba(0, 0, 0, 0.12);
+  }
+
+  .settings-sidebar-item {
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.02), rgba(255, 255, 255, 0.008)),
+      rgba(255, 255, 255, 0);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.025);
+  }
+
+  .settings-sidebar-item-active {
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.11), rgba(255, 255, 255, 0.045)),
+      rgba(255, 255, 255, 0.018);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.08),
+      0 10px 24px rgba(0, 0, 0, 0.08);
+  }
+
+  .settings-sidebar-toggle {
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.012)),
+      rgba(255, 255, 255, 0);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  }
+
+  .soft-divider {
+    border-color: rgba(255, 255, 255, 0.05);
+  }
+
+  .section-intro-panel {
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.032), rgba(255, 255, 255, 0.014)),
+      rgba(11, 17, 24, 0.2);
+    backdrop-filter: blur(18px) saturate(128%);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.05),
+      inset 0 0 20px rgba(255, 255, 255, 0.02);
+  }
+
+  .action-bar-shell {
+    background:
+      linear-gradient(180deg, rgba(8, 17, 26, 0.9), rgba(4, 10, 16, 0.95));
+    backdrop-filter: blur(20px) saturate(125%);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  }
+
+  .widget-shell {
+    background:
+      radial-gradient(circle at top left, rgba(255, 255, 255, 0.095), transparent 30%),
+      radial-gradient(circle at 76% 18%, rgba(104, 198, 255, 0.06), transparent 22%),
+      linear-gradient(180deg, rgba(16, 24, 34, 0.54), rgba(10, 16, 23, 0.34) 52%, rgba(4, 9, 14, 0.22));
+    backdrop-filter: blur(20px) saturate(128%);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.12),
+      inset 0 -8px 16px rgba(0, 0, 0, 0.08),
+      inset 0 0 24px rgba(255, 255, 255, 0.02);
+  }
+
+  .widget-control {
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.014)),
+      rgba(10, 15, 22, 0.14);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.08),
+      0 6px 14px rgba(0, 0, 0, 0.06);
+    transition:
+      background 140ms ease,
+      color 140ms ease,
+      opacity 140ms ease,
+      box-shadow 140ms ease;
+  }
+
+  .widget-pill {
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.014)),
+      rgba(10, 15, 22, 0.14);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.08),
+      0 6px 14px rgba(0, 0, 0, 0.06);
+    transition:
+      background-color 140ms ease,
+      color 140ms ease,
+      opacity 140ms ease,
+      box-shadow 140ms ease,
+      border-color 140ms ease;
+  }
+
+  .widget-icon-button {
+    background: rgba(255, 255, 255, 0.04);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    transition:
+      background-color 120ms ease,
+      color 120ms ease,
+      opacity 120ms ease,
+      border-color 120ms ease;
+  }
+
+  .widget-pill,
+  .widget-icon-button {
+    -webkit-app-region: no-drag;
   }
 
   .titlebar-drag {
@@ -142,6 +323,16 @@
   }
 }
 
+@keyframes loaderSweep {
+  0% {
+    transform: translateX(-110%);
+  }
+
+  100% {
+    transform: translateX(260%);
+  }
+}
+
 .animate-fade-in-up {
   animation: fadeInUp 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
@@ -158,4 +349,8 @@
 
 .animate-spin-smooth {
   animation: spinSmooth 0.8s linear infinite;
+}
+
+.animate-loader-sweep {
+  animation: loaderSweep 1.4s cubic-bezier(0.2, 0.8, 0.2, 1) infinite;
 }

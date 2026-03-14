@@ -18,12 +18,25 @@ class HotkeyConfig(BaseModel):
 
 class AudioConfig(BaseModel):
     input_device: Optional[str] = Field(default=None, description="The specific microphone device name to use. None = system default.")
+    input_device_id: Optional[str] = Field(default=None, description="The Electron media device id to use for capture. None = system default.")
+    input_device_label: Optional[str] = Field(default=None, description="The last-known label for the selected Electron media device.")
+
+class DebugConfig(BaseModel):
+    log_sensitive_transcripts: bool = Field(
+        default=False,
+        description="When enabled, raw transcripts and rewritten output may be written to logs for debugging."
+    )
+    persist_recordings: bool = Field(
+        default=False,
+        description="When enabled, timestamped WAV debug recordings are kept on disk."
+    )
 
 class AppConfig(BaseModel):
     stt: STTConfig = Field(default_factory=STTConfig)
     llm: LLMConfig = Field(default_factory=LLMConfig)
     hotkeys: HotkeyConfig = Field(default_factory=HotkeyConfig)
     audio: AudioConfig = Field(default_factory=AudioConfig)
+    debug: DebugConfig = Field(default_factory=DebugConfig)
     
     # We explicitly EXCLUDE api_keys from the Pydantic model representation 
     # that gets saved to disk. These are managed statically by SecretsManager.

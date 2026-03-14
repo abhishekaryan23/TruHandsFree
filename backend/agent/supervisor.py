@@ -44,7 +44,12 @@ class SupervisorAgent:
 
 --- CURRENT ACTIVE WINDOW CONTEXT ---
 App Name: {app_name}
+Bundle ID: {bundle_id}
 Window Title: {window_title}
+Page Title: {page_title}
+Site Host: {url_host}
+Context Quality: {context_quality}
+Target Type: {target_type}
 -------------------------------------
 """
         
@@ -65,7 +70,12 @@ Window Title: {window_title}
             response = chain.invoke({
                 "system_instruction": system_instruction,
                 "app_name": os_context.get("app_name", "Unknown"),
+                "bundle_id": os_context.get("bundle_id", "Unknown"),
                 "window_title": os_context.get("window_title", "Unknown"),
+                "page_title": os_context.get("page_title", "Unknown"),
+                "url_host": os_context.get("url_host", "Unknown"),
+                "context_quality": os_context.get("context_quality", "empty"),
+                "target_type": os_context.get("target_type", "generic"),
                 "transcript": raw_transcript
             })
             
